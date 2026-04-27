@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pengaduan Masyarakat</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="dashboard-container">
+        <header>
+            <h1>Dashboard Pengaduan</h1>
+            <p>Statistik Unit Layanan Contact Center DJKI (Januari - April 2026)</p>
+            <div class="filter-container">
+                <label for="viewSelector">Lihat Berdasarkan:</label>
+                <select id="viewSelector" onchange="updateDashboardView()">
+                    <option value="Kota">1. Kota</option>
+                    <option value="Rezim">2. Rezim (Unit)</option>
+                    <option value="Bulan">3. Bulan</option>
+                    <option value="Kategori">4. Kategori</option>
+                    <option value="AsalPemohon">5. Asal Pemohon</option>
+                    <option value="Kanal">6. Kanal</option>
+                    <option value="Status">7. Status</option>
+                </select>
+            </div>
+        </header>
+
+        <main>
+            <div class="card map-card">
+                <h2>Peta Persebaran Pengaduan</h2>
+                <div class="map-container" id="indonesiaMap">
+                    <button id="mapBackBtn" class="map-back-btn" onclick="goBackToNational()">← Kembali ke
+                        Nasional</button>
+                </div>
+            </div>
+            <div class="card chart-card">
+                <h2>Grafik Pengaduan</h2>
+                <div class="chart-container">
+                    <canvas id="complaintChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card table-card">
+                <h2>Data Tabel Pengaduan</h2>
+                <div class="table-container">
+                    <table id="complaintTable">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Kota</th>
+                                <th>Jumlah Pengaduan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="province-geo.js"></script>
+    <script src="regency-geo.js"></script>
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
