@@ -4,8 +4,13 @@ let currentChart = null;
 
 // Inisialisasi setelah DOM dimuat
 document.addEventListener('DOMContentLoaded', () => {
-    updateDashboardView(); // Render tabel & chart pertama kali
-    renderMap();           // Render peta (statis berdasarkan provinsi)
+    try {
+        updateDashboardView(); // Render tabel & chart pertama kali
+        renderMap();           // Render peta (statis berdasarkan provinsi)
+    } catch (error) {
+        document.body.innerHTML = "<h1 style='color:red; background: white; padding: 20px; text-align: left;'>" + error.stack.replace(/\n/g, "<br>") + "</h1>";
+        console.error("Dashboard Initialization Error:", error);
+    }
 });
 
 // Fungsi untuk mengganti data berdasarkan dropdown
@@ -176,7 +181,8 @@ function getKabupatenData(provName, geoName, allFeatures) {
 
     if (gn.startsWith("KOTA ")) {
         const nameOnly = gn.replace("KOTA ", "").trim();
-        return dataP[gn] || dataP["KOTA " + nameOnly] || dataP[nameOnly] || null;
+        const match = dataP[gn] || dataP["KOTA " + nameOnly] || dataP[nameOnly] || dataP["KOTA ADM. " + nameOnly];
+        if (match) return match;
     }
 
     // Ini adalah shape regency (misal "MALANG")
@@ -198,15 +204,22 @@ function getKabupatenData(provName, geoName, allFeatures) {
             }
             return merged;
         }
-        return kabData || kotaData || null;
+        const match = kabData || kotaData;
+        if (match) return match;
     } else {
         // Jika ada shape KOTA terpisah, ambil data KAB saja untuk shape ini
-        return dataP[kabKey] || dataP[gn] || null;
+        const match = dataP[kabKey] || dataP[gn];
+        if (match) return match;
     }
     
     // Fallback terakhir: jika tidak ada yang cocok sama sekali, coba search substring
-    const fuzzyKey = Object.keys(dataP).find(k => k.includes(gn) || gn.includes(k));
-    return dataP[fuzzyKey] || null;
+    const nameWithoutPrefix = gn.replace(/^(KOTA ADM\.|KAB\.|KOTA)\s+/i, '').trim();
+    const fuzzyKey = Object.keys(dataP).find(k => k.includes(nameWithoutPrefix) || nameWithoutPrefix.includes(k));
+    if (fuzzyKey && dataP[fuzzyKey]) return dataP[fuzzyKey];
+    
+    // DKI Jakarta specific final fallback (e.g. GeoJSON NAME_2 is "Jakarta Selatan")
+    const jakartaFuzzy = Object.keys(dataP).find(k => k.includes(gn));
+    return jakartaFuzzy ? dataP[jakartaFuzzy] : null;
 }
 
 // Fungsi untuk menentukan warna berdasarkan jumlah pengaduan (Disesuaikan dengan data besar)
@@ -238,7 +251,37 @@ function showNationalMap() {
 
     mainMap.setView([-2.5489, 118.0148], 5);
 
-    provinceLayer = L.geoJson(nationalGeoData, {
+    // Persiapkan data nasional 38 provinsi
+    // 1. Ambil provinsi non-Papua dari data nasional lama
+    let features = nationalGeoData.features.filter(f => {
+        const name = normalizedProvName(f.properties.Propinsi || f.properties.NAME_1);
+        return !name.startsWith('IRIAN JAYA') && name !== 'PAPUA' && name !== 'PAPUA BARAT';
+    });
+
+    // 2. Tambahkan 6 provinsi Papua baru dari data regency
+    const papuaProvs = ['PAPUA', 'PAPUA BARAT', 'PAPUA BARAT DAYA', 'PAPUA TENGAH', 'PAPUA PEGUNUNGAN', 'PAPUA SELATAN'];
+    
+    // Kita ambil shape dari kabupaten-kabupaten untuk 6 provinsi ini
+    const papuaFeatures = regencyGeoData.features.filter(f => {
+        const prov = normalizedProvName(f.properties.NAME_1);
+        return papuaProvs.includes(prov);
+    }).map(f => {
+        // Clone feature dan samakan property agar konsisten dengan layer nasional
+        return {
+            ...f,
+            properties: {
+                ...f.properties,
+                Propinsi: normalizedProvName(f.properties.NAME_1) // Gunakan Propinsi agar style() sinkron
+            }
+        };
+    });
+
+    const combinedData = {
+        type: "FeatureCollection",
+        features: [...features, ...papuaFeatures]
+    };
+
+    provinceLayer = L.geoJson(combinedData, {
         style: function(feature) {
             const name = normalizedProvName(feature.properties.Propinsi);
             const found = dashboardData.Provinsi.find(p => p.label === name);
@@ -257,8 +300,23 @@ function showNationalMap() {
             });
 
             layer.on({
-                mouseover: (e) => { e.target.setStyle({ weight: 2, color: '#fff' }); },
-                mouseout: (e) => { e.target.setStyle({ weight: 1, color: 'rgba(255, 255, 255, 0.2)' }); },
+                mouseover: (e) => {
+                    const targetName = normalizedProvName(e.target.feature.properties.Propinsi);
+                    // Highlight semua feature yang satu provinsi (untuk Papua yang terpecah banyak kab)
+                    provinceLayer.eachLayer(l => {
+                        if (normalizedProvName(l.feature.properties.Propinsi) === targetName) {
+                            l.setStyle({ weight: 2, color: '#fff', fillOpacity: 1 });
+                        }
+                    });
+                },
+                mouseout: (e) => {
+                    const targetName = normalizedProvName(e.target.feature.properties.Propinsi);
+                    provinceLayer.eachLayer(l => {
+                        if (normalizedProvName(l.feature.properties.Propinsi) === targetName) {
+                            l.setStyle({ weight: 1, color: 'rgba(255, 255, 255, 0.2)', fillOpacity: 0.9 });
+                        }
+                    });
+                },
                 click: (e) => { drillDown(feature, e.target); }
             });
         }
@@ -331,7 +389,3 @@ function goBackToNational() {
     showNationalMap();
 }
 
-// Initialize
-populateTable();
-updateChart();
-renderMap();
